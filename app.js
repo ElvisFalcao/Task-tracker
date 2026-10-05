@@ -798,6 +798,46 @@ window.addEventListener('storage', e => {
   if (e.key === STORAGE_KEY) { state = load(); renderAll(); }
 });
 
+/**
+ * A link ending in #add=<base64url JSON array of tasks> adds those tasks to
+ * the existing list (it never replaces anything). Tasks whose id is already
+ * present are skipped, so opening the same link twice does not duplicate.
+ */
+function importFromLink() {
+  const m = location.hash.match(/^#add=(.+)$/);
+  if (!m) return;
+  history.replaceState(null, '', location.pathname + location.search);
+  let incoming;
+  try {
+    const b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    incoming = JSON.parse(new TextDecoder().decode(bytes));
+    if (!Array.isArray(incoming)) throw new Error('not a list');
+  } catch {
+    toast('That task link is broken or incomplete.');
+    return;
+  }
+  const fresh = incoming.filter(t => t?.title && !taskById(t.id));
+  if (!fresh.length) { toast('Those tasks are already in your list.'); return; }
+  if (!confirm(`Add ${fresh.length} task${fresh.length === 1 ? '' : 's'} to your list? Your existing tasks stay as they are.`)) return;
+  for (const t of fresh) {
+    state.tasks.push({
+      id: t.id || uid(), title: String(t.title), notes: t.notes || '',
+      priority: ['high', 'medium', 'low'].includes(t.priority) ? t.priority : 'medium',
+      due: t.due || '', dueTime: t.dueTime || '', remindAt: t.remindAt || '',
+      client: t.client || '', estimateMin: t.estimateMin ?? null, billable: !!t.billable,
+      status: 'todo', createdAt: Date.now(), reminded: false,
+    });
+  }
+  save();
+  view = 'all';
+  toast(`Added ${fresh.length} task${fresh.length === 1 ? '' : 's'}`);
+}
+
+// Pasting a link into a tab that already has the app open only changes the hash.
+window.addEventListener('hashchange', () => { importFromLink(); renderAll(); });
+
+importFromLink();
 renderAll();
 renderNotifStatus();
 setInterval(tickTimer, 1000);
