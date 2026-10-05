@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Workload Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar no-print">
+    <h1>Workload Tracker</h1>
+    <div id="timer-bar" class="timer-bar" hidden>
+      <span class="dot"></span>
+      <span id="timer-task"></span>
+      <strong id="timer-elapsed">00:00:00</strong>
+      <button id="timer-stop" class="btn small danger">Stop</button>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="tasks">Tasks</button>
+      <button class="tab" data-tab="time">Time log</button>
+      <button class="tab" data-tab="invoice">Invoice</button>
+      <button class="tab" data-tab="settings">Settings</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- TASKS -->
+    <section id="tab-tasks" class="panel">
+      <div id="next-up" class="next-up no-print"></div>
+
+      <form id="task-form" class="card task-form">
+        <input type="hidden" name="id">
+        <input name="title" placeholder="What do you need to do?" required autocomplete="off">
+        <div class="row">
+          <label>Priority
+            <select name="priority">
+              <option value="high">High</option>
+              <option value="medium" selected>Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+          <label>Due date <input type="date" name="due"></label>
+          <label>Due time <input type="time" name="dueTime"></label>
+          <label>Remind me at <input type="datetime-local" name="remindAt"></label>
+        </div>
+        <div class="row">
+          <label>Client / project <input name="client" list="client-list" placeholder="optional"></label>
+          <label>Estimate (min) <input type="number" name="estimateMin" min="0" step="5" placeholder="e.g. 60"></label>
+          <label class="check"><input type="checkbox" name="billable"> Billable</label>
+        </div>
+        <textarea name="notes" rows="2" placeholder="Notes (optional)"></textarea>
+        <div class="row end">
+          <button type="button" id="task-cancel" class="btn ghost" hidden>Cancel</button>
+          <button class="btn primary" id="task-submit">Add task</button>
+        </div>
+      </form>
+      <datalist id="client-list"></datalist>
+
+      <div class="filters">
+        <button class="chip active" data-view="today">Today</button>
+        <button class="chip" data-view="week">This week</button>
+        <button class="chip" data-view="all">All open</button>
+        <button class="chip" data-view="done">Done</button>
+        <input id="search" type="search" placeholder="Search…">
+      </div>
+      <ul id="task-list" class="task-list"></ul>
+      <p id="task-empty" class="empty" hidden>Nothing here. Add a task above.</p>
+    </section>
+
+    <!-- TIME LOG -->
+    <section id="tab-time" class="panel" hidden>
+      <div class="stats" id="time-stats"></div>
+      <form id="entry-form" class="card row">
+        <label>Task <select name="taskId" required></select></label>
+        <label>Date <input type="date" name="date" required></label>
+        <label>Minutes <input type="number" name="minutes" min="1" required></label>
+        <label class="grow">Note <input name="note" placeholder="optional"></label>
+        <button class="btn primary">Add time manually</button>
+      </form>
+      <div id="time-log"></div>
+    </section>
+
+    <!-- INVOICE -->
+    <section id="tab-invoice" class="panel" hidden>
+      <form id="invoice-form" class="card no-print">
+        <div class="row">
+          <label>Client <select name="client"></select></label>
+          <label>From <input type="date" name="from" required></label>
+          <label>To <input type="date" name="to" required></label>
+          <label>Hourly rate <input type="number" name="rate" min="0" step="0.01" required></label>
+          <label>Tax % <input type="number" name="tax" min="0" step="0.01"></label>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" name="unbilledOnly" checked> Only time not yet invoiced</label>
+          <label class="check"><input type="checkbox" name="billableOnly" checked> Only billable tasks</label>
+        </div>
+        <div class="row end">
+          <button class="btn primary">Generate invoice</button>
+        </div>
+      </form>
+      <div id="invoice-out"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="tab-settings" class="panel" hidden>
+      <form id="settings-form" class="card">
+        <h2>Your details (shown on invoices)</h2>
+        <div class="row">
+          <label class="grow">Name / business <input name="name"></label>
+          <label class="grow">Email <input name="email" type="email"></label>
+        </div>
+        <label>Address <textarea name="address" rows="2"></textarea></label>
+        <div class="row">
+          <label>Default hourly rate <input name="rate" type="number" min="0" step="0.01"></label>
+          <label>Currency <input name="currency" maxlength="3" placeholder="USD"></label>
+          <label>Default tax % <input name="tax" type="number" min="0" step="0.01"></label>
+          <label>Next invoice # <input name="nextInvoiceNo" type="number" min="1"></label>
+        </div>
+        <label>Payment instructions <textarea name="payment" rows="2" placeholder="Bank details, PayPal, due in 14 days…"></textarea></label>
+        <div class="row end"><button class="btn primary">Save settings</button></div>
+      </form>
+
+      <div class="card">
+        <h2>Reminders</h2>
+        <p>Browser notifications fire while this page is open (a pinned tab works well).
+          If you need a reminder when the app is closed, use <em>📅 Calendar</em> on a task. It downloads a calendar event that has an alarm.</p>
+        <p>Status: <strong id="notif-status"></strong></p>
+        <button id="notif-enable" class="btn">Enable notifications</button>
+      </div>
+
+      <div class="card">
+        <h2>Backup</h2>
+        <p>Your data stays in this browser only. Export a backup now and then, or to move to another computer.</p>
+        <div class="row">
+          <button id="export" class="btn">Export backup (JSON)</button>
+          <label class="btn">Import backup <input id="import" type="file" accept="application/json" hidden></label>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toasts" class="toasts no-print"></div>
+  <script src="app.js"></script>
+</body>
+</html>
