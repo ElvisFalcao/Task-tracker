@@ -9,6 +9,7 @@ Open `index.html` in your browser. To get it on your phone or any computer, see 
 
 ### Tasks
 - Add a task with a **priority** (High / Medium / Low), an optional **due date and time**, a **reminder time**, a **client/project**, an **estimate** and a **billable** flag.
+- Click anywhere in a date or time field to open the picker. You can also use the quick buttons: **Today / Tomorrow / This Friday / Next Monday** for the due date, and **In 1 hour / Today 6 PM / Tomorrow 9 AM / 1 hour before due** for reminders.
 - Views:
   - **Today**: overdue tasks, tasks due today, and High-priority tasks with no date
   - **This week**: tasks due in the next 7 days
@@ -20,7 +21,7 @@ Open `index.html` in your browser. To get it on your phone or any computer, see 
 - Press **▶ Start** on any task. The timer stays visible at the top and in the browser tab title. Only one timer runs at a time, and starting another task stops the current one.
 - The timer keeps running if you close or reload the page.
 - Each task shows the time you've tracked against its estimate. The estimate turns orange when you go over it.
-- **Time log** shows today and this week's totals, plus unbilled hours and their value. You can also add time manually.
+- **Time log** shows today and this week's totals, plus unbilled hours and their value. You can also add time manually with a **From / To** time or a number of minutes.
 
 ### Reminders
 - Under **Settings → Enable notifications**, you can allow browser notifications. A notification and an in-app pop-up appear at each task's "Remind me at" time while the app is open. A pinned tab works well for this.

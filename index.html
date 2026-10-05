@@ -43,6 +43,22 @@
           <label>Due time <input type="time" name="dueTime"></label>
           <label>Remind me at <input type="datetime-local" name="remindAt"></label>
         </div>
+        <div class="quick" data-quick="due">
+          <span>Due:</span>
+          <button type="button" data-v="today">Today</button>
+          <button type="button" data-v="tomorrow">Tomorrow</button>
+          <button type="button" data-v="friday">This Friday</button>
+          <button type="button" data-v="nextweek">Next Monday</button>
+          <button type="button" data-v="clear">Clear</button>
+        </div>
+        <div class="quick" data-quick="remind">
+          <span>Remind:</span>
+          <button type="button" data-v="1h">In 1 hour</button>
+          <button type="button" data-v="evening">Today 6 PM</button>
+          <button type="button" data-v="tomorrow9">Tomorrow 9 AM</button>
+          <button type="button" data-v="beforedue">1 hour before due</button>
+          <button type="button" data-v="clear">Clear</button>
+        </div>
         <div class="row">
           <label>Client / project <input name="client" list="client-list" placeholder="optional"></label>
           <label>Estimate (min) <input type="number" name="estimateMin" min="0" step="5" placeholder="e.g. 60"></label>
@@ -73,7 +89,9 @@
       <form id="entry-form" class="card row">
         <label>Task <select name="taskId" required></select></label>
         <label>Date <input type="date" name="date" required></label>
-        <label>Minutes <input type="number" name="minutes" min="1" required></label>
+        <label>From <input type="time" name="from"></label>
+        <label>To <input type="time" name="to"></label>
+        <label>or Minutes <input type="number" name="minutes" min="1" placeholder="e.g. 45"></label>
         <label class="grow">Note <input name="note" placeholder="optional"></label>
         <button class="btn primary">Add time manually</button>
       </form>

@@ -74,6 +74,15 @@ input, select, textarea {
   max-width: 100%;
 }
 textarea { width: 100%; resize: vertical; }
+.quick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: -2px 0 10px; font-size: .8rem; color: var(--muted); }
+.quick span { min-width: 56px; }
+.quick button {
+  font: inherit; cursor: pointer; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+}
+.quick button:hover { border-color: var(--accent); color: var(--accent); }
+.quick button[data-v=clear] { color: var(--muted); }
+input[type=date], input[type=time], input[type=datetime-local] { cursor: pointer; }
 .task-form > input[name=title] { width: 100%; font-size: 1.05rem; margin-bottom: 10px; }
 .task-form textarea { margin-bottom: 10px; }
 

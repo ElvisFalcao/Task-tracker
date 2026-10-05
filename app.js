@@ -487,6 +487,57 @@ function exportIcs(id) {
   download(`${slug}.ics`, lines.join('\r\n'), 'text/calendar');
 }
 
+/* ---------- Date & time pickers ---------- */
+
+// Open the browser's picker when clicking anywhere in the field, not only on the small icon.
+document.addEventListener('click', e => {
+  const el = e.target;
+  if (el.matches?.('input[type=date], input[type=time], input[type=datetime-local]')) {
+    try { el.showPicker?.(); } catch { /* not allowed in some browsers; the field still works */ }
+  }
+});
+
+function localDateTime(d) {
+  return `${dateStr(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function nextWeekday(target) { // 0 = Sunday … 6 = Saturday; today counts if it matches
+  const d = parseDate(dateStr());
+  d.setDate(d.getDate() + ((target - d.getDay() + 7) % 7));
+  return dateStr(d);
+}
+
+$$('.quick').forEach(group => group.addEventListener('click', e => {
+  const v = e.target.dataset.v;
+  if (!v) return;
+  const f = form.elements;
+
+  if (group.dataset.quick === 'due') {
+    const map = {
+      today: dateStr(),
+      tomorrow: addDays(dateStr(), 1),
+      friday: nextWeekday(5),
+      nextweek: addDays(nextWeekday(1), nextWeekday(1) === dateStr() ? 7 : 0),
+      clear: '',
+    };
+    f.due.value = map[v];
+    if (v === 'clear') f.dueTime.value = '';
+    return;
+  }
+
+  const d = new Date();
+  if (v === 'clear') { f.remindAt.value = ''; return; }
+  if (v === '1h') d.setTime(d.getTime() + 3600000);
+  if (v === 'evening') d.setHours(18, 0, 0, 0);
+  if (v === 'tomorrow9') { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); }
+  if (v === 'beforedue') {
+    if (!f.due.value) { toast('Pick a due date first'); return; }
+    const due = new Date(`${f.due.value}T${f.dueTime.value || '09:00'}`);
+    d.setTime(due.getTime() - 3600000);
+  }
+  f.remindAt.value = localDateTime(d);
+}));
+
 /* ---------- Time log ---------- */
 
 const entryForm = $('#entry-form');
@@ -494,11 +545,25 @@ const entryForm = $('#entry-form');
 entryForm.addEventListener('submit', e => {
   e.preventDefault();
   const f = entryForm.elements;
-  const start = parseDate(f.date.value);
-  start.setHours(9, 0, 0, 0);
-  const end = start.getTime() + Number(f.minutes.value) * 60000;
-  state.entries.push({ id: uid(), taskId: f.taskId.value, start: start.getTime(), end, note: f.note.value.trim(), manual: true });
+  let start, end, manual = false;
+  if (f.from.value && f.to.value) {
+    start = new Date(`${f.date.value}T${f.from.value}`).getTime();
+    end = new Date(`${f.date.value}T${f.to.value}`).getTime();
+    if (end <= start) end += 86400000; // e.g. 23:00 → 01:00 goes past midnight
+  } else if (Number(f.minutes.value) > 0) {
+    const d = parseDate(f.date.value);
+    d.setHours(9, 0, 0, 0);
+    start = d.getTime();
+    end = start + Number(f.minutes.value) * 60000;
+    manual = true;
+  } else {
+    toast('Enter a From and To time, or the number of minutes');
+    return;
+  }
+  state.entries.push({ id: uid(), taskId: f.taskId.value, start, end, note: f.note.value.trim(), manual });
   save();
+  f.from.value = '';
+  f.to.value = '';
   f.minutes.value = '';
   f.note.value = '';
   renderTime();
