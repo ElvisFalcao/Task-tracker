@@ -3,161 +3,550 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Workload Tracker</title>
+  <meta name="color-scheme" content="light dark">
+  <title>Workload</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a6b68'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11.5' fill='none' stroke='white' stroke-width='3' stroke-linecap='square'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="topbar no-print">
-    <h1>Workload Tracker</h1>
-    <div id="timer-bar" class="timer-bar" hidden>
-      <span class="dot"></span>
-      <span id="timer-task"></span>
-      <strong id="timer-elapsed">00:00:00</strong>
-      <button id="timer-stop" class="btn small danger">Stop</button>
+  <a class="skip-link" href="#main" data-act="skip">Skip to main content</a>
+
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 5h16l-6 7.5V19l-4-2v-4.5z"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="2"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V5m0 0-4 4m4-4 4 4M5 20h14"/></symbol>
+    <symbol id="i-printer" viewBox="0 0 24 24"><path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M7 14h10v6H7z"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 1 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-tasks" viewBox="0 0 24 24"><path d="m4 6.5 2 2 3.5-3.5M4 15.5l2 2 3.5-3.5M13 7h7M13 16h7"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2"/></symbol>
+    <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h8M16 7h4M4 17h4M12 17h8"/><circle cx="14" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
+  </svg>
+
+  <div class="app">
+    <!-- Sidebar: persistent on medium/wide, a menu drawer on narrow -->
+    <aside class="sidebar" id="sidebar" aria-label="Main">
+      <div class="brand">
+        <span class="brand-name">Workload</span>
+        <button type="button" class="icon-btn sidebar-close" data-act="close-nav" aria-label="Close menu" data-tip="Close menu" data-kbd="Esc">
+          <svg class="i" aria-hidden="true"><use href="#i-x"/></svg>
+        </button>
+      </div>
+      <nav class="nav" aria-label="Main">
+        <a class="nav-link" href="#/tasks" data-route="tasks"><svg class="i" aria-hidden="true"><use href="#i-tasks"/></svg><span>Tasks</span><span class="nav-meta" id="nav-today"></span></a>
+        <a class="nav-link" href="#/time" data-route="time"><svg class="i" aria-hidden="true"><use href="#i-clock"/></svg><span>Time log</span></a>
+        <a class="nav-link" href="#/invoice" data-route="invoice"><svg class="i" aria-hidden="true"><use href="#i-receipt"/></svg><span>Invoice</span></a>
+        <a class="nav-link" href="#/settings" data-route="settings"><svg class="i" aria-hidden="true"><use href="#i-sliders"/></svg><span>Settings</span></a>
+      </nav>
+      <section class="timer-card" id="timer-card" aria-label="Running timer" hidden>
+        <p class="timer-status"><span class="rec-dot" aria-hidden="true"></span>Timer running</p>
+        <p class="timer-task" id="timer-task"></p>
+        <p class="timer-elapsed" id="timer-elapsed">0:00:00</p>
+        <button type="button" class="btn btn-block" data-act="stop-timer"><svg class="i" aria-hidden="true"><use href="#i-stop"/></svg>Stop timer</button>
+      </section>
+    </aside>
+
+    <div class="main-col" id="main-col">
+      <header class="topbar">
+        <button type="button" class="icon-btn" id="nav-open" data-act="open-nav" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false" data-tip="Open menu">
+          <svg class="i" aria-hidden="true"><use href="#i-menu"/></svg>
+        </button>
+        <span class="brand-name">Workload</span>
+        <button type="button" class="timer-chip" id="timer-chip" data-act="stop-timer" aria-label="Stop timer" data-tip="Stop timer" hidden>
+          <span class="rec-dot" aria-hidden="true"></span><span id="timer-chip-elapsed">0:00:00</span>
+          <svg class="i" aria-hidden="true"><use href="#i-stop"/></svg>
+        </button>
+      </header>
+
+      <main id="main" class="page-wrap" tabindex="-1">
+
+        <!-- ===================== Tasks — Pattern 1: List / Index ===================== -->
+        <section class="page" id="page-tasks" aria-labelledby="h-tasks" hidden>
+          <header class="page-header">
+            <div class="page-heading">
+              <h1 id="h-tasks" tabindex="-1">Tasks</h1>
+              <p class="page-desc">Ordered by what to do next: priority first, then how soon it's due.</p>
+            </div>
+            <div class="page-actions">
+              <button type="button" class="btn btn-primary" data-act="new-task"><svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>New task</button>
+            </div>
+          </header>
+
+          <div class="tabs" role="tablist" aria-label="Task views">
+            <button type="button" role="tab" class="tab" id="tab-today" data-view="today" aria-controls="task-frame">Today<span class="tab-count"></span></button>
+            <button type="button" role="tab" class="tab" id="tab-week" data-view="week" aria-controls="task-frame">This week<span class="tab-count"></span></button>
+            <button type="button" role="tab" class="tab" id="tab-all" data-view="all" aria-controls="task-frame">All open<span class="tab-count"></span></button>
+            <button type="button" role="tab" class="tab" id="tab-done" data-view="done" aria-controls="task-frame">Done<span class="tab-count"></span></button>
+          </div>
+
+          <div class="toolbar">
+            <div class="search">
+              <svg class="i" aria-hidden="true"><use href="#i-search"/></svg>
+              <label for="task-q" class="search-label">Search</label>
+              <input id="task-q" type="search" placeholder="Title, notes or client" autocomplete="off" data-search>
+              <kbd class="search-kbd" aria-hidden="true">/</kbd>
+            </div>
+            <div class="popover-anchor">
+              <button type="button" class="btn" id="task-filter-btn" aria-expanded="false" aria-controls="task-filters">
+                <svg class="i" aria-hidden="true"><use href="#i-filter"/></svg>Filters<span class="btn-count" id="task-filter-count"></span>
+              </button>
+              <div class="popover" id="task-filters" role="dialog" aria-label="Filter tasks" hidden>
+                <fieldset class="field">
+                  <legend>Priority</legend>
+                  <div class="check-row">
+                    <label class="check"><input type="checkbox" name="priority" value="high">High</label>
+                    <label class="check"><input type="checkbox" name="priority" value="medium">Medium</label>
+                    <label class="check"><input type="checkbox" name="priority" value="low">Low</label>
+                  </div>
+                </fieldset>
+                <div class="field">
+                  <label for="tf-filter-client">Client or project</label>
+                  <select id="tf-filter-client" name="client"></select>
+                </div>
+                <fieldset class="field">
+                  <legend>Billing</legend>
+                  <div class="check-row">
+                    <label class="check"><input type="radio" name="billing" value="any" checked>Any</label>
+                    <label class="check"><input type="radio" name="billing" value="billable">Billable</label>
+                    <label class="check"><input type="radio" name="billing" value="nonbillable">Not billable</label>
+                  </div>
+                </fieldset>
+                <div class="popover-foot">
+                  <button type="button" class="btn btn-ghost" data-act="clear-task-filters">Clear all filters</button>
+                  <button type="button" class="btn" data-act="close-popover">Close filters</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="chips" id="task-chips" hidden></div>
+
+          <div class="frame" id="task-frame" role="tabpanel">
+            <table class="table tasks-table">
+              <caption class="sr-only">Tasks</caption>
+              <thead>
+                <tr>
+                  <th class="col-check" scope="col"><span class="sr-only">Done</span></th>
+                  <th class="col-title" scope="col"><button type="button" class="sort" data-sort="title">Task</button></th>
+                  <th class="col-priority" scope="col"><button type="button" class="sort" data-sort="priority">Priority</button></th>
+                  <th class="col-due" scope="col"><button type="button" class="sort" data-sort="due">Due</button></th>
+                  <th class="col-client" scope="col"><button type="button" class="sort" data-sort="client">Client</button></th>
+                  <th class="col-time num" scope="col"><button type="button" class="sort" data-sort="time">Time</button></th>
+                  <th class="col-actions" scope="col"><span class="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody id="task-rows"></tbody>
+            </table>
+            <div class="empty" id="task-empty" hidden></div>
+            <div class="pager" id="task-pager"></div>
+          </div>
+        </section>
+
+        <!-- ===================== Time log — Pattern 1: List / Index ===================== -->
+        <section class="page" id="page-time" aria-labelledby="h-time" hidden>
+          <header class="page-header">
+            <div class="page-heading">
+              <h1 id="h-time" tabindex="-1">Time log</h1>
+              <p class="page-desc" id="time-desc"></p>
+            </div>
+            <div class="page-actions">
+              <button type="button" class="btn btn-primary" data-act="new-entry"><svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>Add time</button>
+            </div>
+          </header>
+
+          <div class="toolbar">
+            <div class="search">
+              <svg class="i" aria-hidden="true"><use href="#i-search"/></svg>
+              <label for="time-q" class="search-label">Search</label>
+              <input id="time-q" type="search" placeholder="Task, client or note" autocomplete="off" data-search>
+              <kbd class="search-kbd" aria-hidden="true">/</kbd>
+            </div>
+            <div class="popover-anchor">
+              <button type="button" class="btn" id="time-filter-btn" aria-expanded="false" aria-controls="time-filters">
+                <svg class="i" aria-hidden="true"><use href="#i-filter"/></svg>Filters<span class="btn-count" id="time-filter-count"></span>
+              </button>
+              <div class="popover" id="time-filters" role="dialog" aria-label="Filter time entries" hidden>
+                <div class="field-row">
+                  <div class="field">
+                    <label for="time-from">From</label>
+                    <input id="time-from" type="date" name="from">
+                  </div>
+                  <div class="field">
+                    <label for="time-to">To</label>
+                    <input id="time-to" type="date" name="to">
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="time-filter-client">Client or project</label>
+                  <select id="time-filter-client" name="client"></select>
+                </div>
+                <fieldset class="field">
+                  <legend>Invoicing</legend>
+                  <div class="check-row">
+                    <label class="check"><input type="radio" name="status" value="any" checked>Any</label>
+                    <label class="check"><input type="radio" name="status" value="open">Not invoiced</label>
+                    <label class="check"><input type="radio" name="status" value="invoiced">Invoiced</label>
+                  </div>
+                </fieldset>
+                <div class="popover-foot">
+                  <button type="button" class="btn btn-ghost" data-act="clear-time-filters">Clear all filters</button>
+                  <button type="button" class="btn" data-act="close-popover">Close filters</button>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="icon-btn filled" data-act="export-csv" aria-label="Export CSV" data-tip="Export CSV">
+              <svg class="i" aria-hidden="true"><use href="#i-download"/></svg>
+            </button>
+          </div>
+          <div class="chips" id="time-chips" hidden></div>
+
+          <div class="frame">
+            <table class="table time-table">
+              <caption class="sr-only">Time entries, newest first</caption>
+              <thead>
+                <tr>
+                  <th class="col-title" scope="col">Task</th>
+                  <th class="col-client" scope="col">Client</th>
+                  <th class="col-span" scope="col">Time</th>
+                  <th class="col-dur num" scope="col">Duration</th>
+                  <th class="col-inv" scope="col">Invoice</th>
+                  <th class="col-actions" scope="col"><span class="sr-only">Open</span></th>
+                </tr>
+              </thead>
+              <tbody id="time-rows"></tbody>
+            </table>
+            <div class="empty" id="time-empty" hidden></div>
+            <div class="pager" id="time-pager"></div>
+          </div>
+        </section>
+
+        <!-- ===================== Invoice — Pattern 9: Analytics / Reporting (report runner) ===================== -->
+        <section class="page" id="page-invoice" aria-labelledby="h-invoice" hidden>
+          <header class="page-header">
+            <div class="page-heading">
+              <h1 id="h-invoice" tabindex="-1">Invoice</h1>
+              <p class="page-desc">Build an invoice from your billable time. The preview updates as you change the settings.</p>
+            </div>
+            <div class="page-actions">
+              <button type="button" class="btn" data-act="mark-invoiced"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Mark as invoiced</button>
+              <button type="button" class="btn btn-primary" data-act="print-invoice"><svg class="i" aria-hidden="true"><use href="#i-printer"/></svg>Print or save PDF</button>
+            </div>
+          </header>
+
+          <form class="params" id="inv-form" novalidate>
+            <div class="field">
+              <label for="inv-from">From</label>
+              <input id="inv-from" type="date" name="from" required>
+            </div>
+            <div class="field">
+              <label for="inv-to">To</label>
+              <input id="inv-to" type="date" name="to" required>
+            </div>
+            <div class="field field-grow">
+              <label for="inv-client">Client or project</label>
+              <select id="inv-client" name="client"></select>
+            </div>
+            <div class="field field-narrow">
+              <label for="inv-rate">Hourly rate</label>
+              <input id="inv-rate" type="number" name="rate" min="0" step="0.01" inputmode="decimal">
+            </div>
+            <div class="field field-narrow">
+              <label for="inv-tax">Tax (%)</label>
+              <input id="inv-tax" type="number" name="tax" min="0" step="0.01" inputmode="decimal">
+            </div>
+            <div class="params-checks">
+              <label class="check"><input type="checkbox" name="unbilledOnly" checked>Only time not yet invoiced</label>
+              <label class="check"><input type="checkbox" name="billableOnly" checked>Only billable tasks</label>
+            </div>
+          </form>
+
+          <p class="summary" id="inv-summary" aria-live="polite"></p>
+          <div class="paper-frame">
+            <div class="paper" id="invoice-doc"></div>
+            <div class="empty" id="invoice-empty" hidden></div>
+          </div>
+        </section>
+
+        <!-- ===================== Settings — Pattern 5: Settings / Configuration ===================== -->
+        <section class="page" id="page-settings" aria-labelledby="h-settings" hidden>
+          <header class="page-header">
+            <div class="page-heading">
+              <h1 id="h-settings" tabindex="-1">Settings</h1>
+              <p class="page-desc">Your invoice details, reminders and backups. Everything is stored in this browser only.</p>
+            </div>
+          </header>
+
+          <div class="settings">
+            <nav class="settings-nav" aria-label="Settings sections">
+              <button type="button" class="settings-link" data-target="set-business">Business details</button>
+              <button type="button" class="settings-link" data-target="set-invoice">Invoice defaults</button>
+              <button type="button" class="settings-link" data-target="set-reminders">Reminders</button>
+              <button type="button" class="settings-link" data-target="set-backup">Backup</button>
+              <button type="button" class="settings-link" data-target="set-danger">Danger zone</button>
+            </nav>
+
+            <div class="settings-body">
+              <section class="set-section" id="set-business" aria-labelledby="h-set-business">
+                <h2 id="h-set-business">Business details</h2>
+                <p class="set-desc">Shown at the top of every invoice.</p>
+                <form id="form-business" novalidate>
+                  <div class="field">
+                    <label for="s-name">Name or business name</label>
+                    <input id="s-name" name="name" autocomplete="organization">
+                  </div>
+                  <div class="field">
+                    <label for="s-email">Email <span class="optional">(optional)</span></label>
+                    <input id="s-email" name="email" type="email" autocomplete="email" placeholder="name@example.com" aria-describedby="s-email-msg">
+                    <p class="field-msg" id="s-email-msg"></p>
+                  </div>
+                  <div class="field">
+                    <label for="s-address">Address <span class="optional">(optional)</span></label>
+                    <textarea id="s-address" name="address" rows="3" autocomplete="street-address"></textarea>
+                  </div>
+                  <div class="form-actions"><button type="submit" class="btn btn-primary">Save changes</button></div>
+                </form>
+              </section>
+
+              <section class="set-section" id="set-invoice" aria-labelledby="h-set-invoice">
+                <h2 id="h-set-invoice">Invoice defaults</h2>
+                <p class="set-desc">Used to fill in new invoices. You can still change them on the Invoice page.</p>
+                <form id="form-invoice" novalidate>
+                  <div class="field-row">
+                    <div class="field">
+                      <label for="s-rate">Hourly rate</label>
+                      <input id="s-rate" name="rate" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="s-rate-msg">
+                      <p class="field-msg" id="s-rate-msg"></p>
+                    </div>
+                    <div class="field">
+                      <label for="s-currency">Currency</label>
+                      <select id="s-currency" name="currency"></select>
+                    </div>
+                  </div>
+                  <div class="field-row">
+                    <div class="field">
+                      <label for="s-tax">Tax (%)</label>
+                      <input id="s-tax" name="tax" type="number" min="0" step="0.01" inputmode="decimal">
+                    </div>
+                    <div class="field">
+                      <label for="s-next">Next invoice number</label>
+                      <input id="s-next" name="nextInvoiceNo" type="number" min="1" step="1" inputmode="numeric" aria-describedby="s-next-msg">
+                      <p class="field-msg" id="s-next-msg"></p>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label for="s-payment">Payment instructions <span class="optional">(optional)</span></label>
+                    <textarea id="s-payment" name="payment" rows="3" placeholder="Bank transfer to … · Due within 14 days" aria-describedby="s-payment-hint"></textarea>
+                    <p class="field-msg hint" id="s-payment-hint">Printed at the bottom of the invoice.</p>
+                  </div>
+                  <div class="form-actions"><button type="submit" class="btn btn-primary">Save changes</button></div>
+                </form>
+              </section>
+
+              <section class="set-section" id="set-reminders" aria-labelledby="h-set-reminders">
+                <h2 id="h-set-reminders">Reminders</h2>
+                <p class="set-desc">Reminders pop up while this page is open in a tab. For reminders when it's closed, open a task and choose <em>Add to calendar</em>.</p>
+                <div class="status-row">
+                  <div>
+                    <p class="status-label">Browser notifications</p>
+                    <p class="status-value" id="notif-status"></p>
+                  </div>
+                  <button type="button" class="btn" id="notif-enable"><svg class="i" aria-hidden="true"><use href="#i-bell"/></svg>Turn on notifications</button>
+                </div>
+              </section>
+
+              <section class="set-section" id="set-backup" aria-labelledby="h-set-backup">
+                <h2 id="h-set-backup">Backup</h2>
+                <p class="set-desc">Your data lives only in this browser. Download a backup now and then, or to move to another device.</p>
+                <button type="button" class="btn" data-act="export-backup"><svg class="i" aria-hidden="true"><use href="#i-download"/></svg>Download backup</button>
+              </section>
+
+              <section class="set-section danger-zone" id="set-danger" aria-labelledby="h-set-danger">
+                <h2 id="h-set-danger">Danger zone</h2>
+                <p class="set-desc">Restoring a backup replaces every task, time entry and setting in this browser with the ones in the file.</p>
+                <button type="button" class="btn btn-danger-soft" data-act="restore-backup"><svg class="i" aria-hidden="true"><use href="#i-upload"/></svg>Restore from backup</button>
+                <input type="file" id="restore-file" accept="application/json,.json" hidden>
+              </section>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
-    <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="tasks">Tasks</button>
-      <button class="tab" data-tab="time">Time log</button>
-      <button class="tab" data-tab="invoice">Invoice</button>
-      <button class="tab" data-tab="settings">Settings</button>
-    </nav>
-  </header>
+  </div>
 
-  <main>
-    <!-- TASKS -->
-    <section id="tab-tasks" class="panel">
-      <div id="next-up" class="next-up no-print"></div>
+  <!-- ===================== Overlays ===================== -->
+  <div class="scrim" id="scrim" hidden></div>
 
-      <form id="task-form" class="card task-form">
-        <input type="hidden" name="id">
-        <input name="title" placeholder="What do you need to do?" required autocomplete="off">
-        <div class="row">
-          <label>Priority
-            <select name="priority">
-              <option value="high">High</option>
-              <option value="medium" selected>Medium</option>
-              <option value="low">Low</option>
-            </select>
-          </label>
-          <label>Due date <input type="date" name="due"></label>
-          <label>Due time <input type="time" name="dueTime"></label>
-          <label>Remind me at <input type="datetime-local" name="remindAt"></label>
-        </div>
-        <div class="quick" data-quick="due">
-          <span>Due:</span>
-          <button type="button" data-v="today">Today</button>
-          <button type="button" data-v="tomorrow">Tomorrow</button>
-          <button type="button" data-v="friday">This Friday</button>
-          <button type="button" data-v="nextweek">Next Monday</button>
-          <button type="button" data-v="clear">Clear</button>
-        </div>
-        <div class="quick" data-quick="remind">
-          <span>Remind:</span>
-          <button type="button" data-v="1h">In 1 hour</button>
-          <button type="button" data-v="evening">Today 6 PM</button>
-          <button type="button" data-v="tomorrow9">Tomorrow 9 AM</button>
-          <button type="button" data-v="beforedue">1 hour before due</button>
-          <button type="button" data-v="clear">Clear</button>
-        </div>
-        <div class="row">
-          <label>Client / project <input name="client" list="client-list" placeholder="optional"></label>
-          <label>Estimate (min) <input type="number" name="estimateMin" min="0" step="5" placeholder="e.g. 60"></label>
-          <label class="check"><input type="checkbox" name="billable"> Billable</label>
-        </div>
-        <textarea name="notes" rows="2" placeholder="Notes (optional)"></textarea>
-        <div class="row end">
-          <button type="button" id="task-cancel" class="btn ghost" hidden>Cancel</button>
-          <button class="btn primary" id="task-submit">Add task</button>
-        </div>
-      </form>
-      <datalist id="client-list"></datalist>
+  <!-- Task slide-over -->
+  <aside class="drawer" id="task-drawer" role="dialog" aria-modal="true" aria-labelledby="task-drawer-title" hidden>
+    <form id="task-form" class="drawer-form" novalidate>
+      <header class="drawer-head">
+        <h2 id="task-drawer-title">New task</h2>
+        <button type="button" class="icon-btn" data-act="close-drawer" aria-label="Close panel" data-tip="Close panel" data-kbd="Esc">
+          <svg class="i" aria-hidden="true"><use href="#i-x"/></svg>
+        </button>
+      </header>
+      <div class="drawer-body">
+        <p class="notice" id="task-draft-note" hidden>
+          <span id="task-draft-text">Draft restored.</span>
+          <button type="button" class="link-btn" data-act="discard-task-draft">Discard draft</button>
+        </p>
 
-      <div class="filters">
-        <button class="chip active" data-view="today">Today</button>
-        <button class="chip" data-view="week">This week</button>
-        <button class="chip" data-view="all">All open</button>
-        <button class="chip" data-view="done">Done</button>
-        <input id="search" type="search" placeholder="Search…">
-      </div>
-      <ul id="task-list" class="task-list"></ul>
-      <p id="task-empty" class="empty" hidden>Nothing here. Add a task above.</p>
-    </section>
-
-    <!-- TIME LOG -->
-    <section id="tab-time" class="panel" hidden>
-      <div class="stats" id="time-stats"></div>
-      <form id="entry-form" class="card row">
-        <label>Task <select name="taskId" required></select></label>
-        <label>Date <input type="date" name="date" required></label>
-        <label>From <input type="time" name="from"></label>
-        <label>To <input type="time" name="to"></label>
-        <label>or Minutes <input type="number" name="minutes" min="1" placeholder="e.g. 45"></label>
-        <label class="grow">Note <input name="note" placeholder="optional"></label>
-        <button class="btn primary">Add time manually</button>
-      </form>
-      <div id="time-log"></div>
-    </section>
-
-    <!-- INVOICE -->
-    <section id="tab-invoice" class="panel" hidden>
-      <form id="invoice-form" class="card no-print">
-        <div class="row">
-          <label>Client <select name="client"></select></label>
-          <label>From <input type="date" name="from" required></label>
-          <label>To <input type="date" name="to" required></label>
-          <label>Hourly rate <input type="number" name="rate" min="0" step="0.01" required></label>
-          <label>Tax % <input type="number" name="tax" min="0" step="0.01"></label>
+        <div class="field">
+          <label for="tf-title">Task</label>
+          <input id="tf-title" name="title" required autocomplete="off" aria-describedby="tf-title-msg">
+          <p class="field-msg" id="tf-title-msg"></p>
         </div>
-        <div class="row">
-          <label class="check"><input type="checkbox" name="unbilledOnly" checked> Only time not yet invoiced</label>
-          <label class="check"><input type="checkbox" name="billableOnly" checked> Only billable tasks</label>
-        </div>
-        <div class="row end">
-          <button class="btn primary">Generate invoice</button>
-        </div>
-      </form>
-      <div id="invoice-out"></div>
-    </section>
 
-    <!-- SETTINGS -->
-    <section id="tab-settings" class="panel" hidden>
-      <form id="settings-form" class="card">
-        <h2>Your details (shown on invoices)</h2>
-        <div class="row">
-          <label class="grow">Name / business <input name="name"></label>
-          <label class="grow">Email <input name="email" type="email"></label>
-        </div>
-        <label>Address <textarea name="address" rows="2"></textarea></label>
-        <div class="row">
-          <label>Default hourly rate <input name="rate" type="number" min="0" step="0.01"></label>
-          <label>Currency <input name="currency" maxlength="3" placeholder="USD"></label>
-          <label>Default tax % <input name="tax" type="number" min="0" step="0.01"></label>
-          <label>Next invoice # <input name="nextInvoiceNo" type="number" min="1"></label>
-        </div>
-        <label>Payment instructions <textarea name="payment" rows="2" placeholder="Bank details, PayPal, due in 14 days…"></textarea></label>
-        <div class="row end"><button class="btn primary">Save settings</button></div>
-      </form>
+        <fieldset class="field">
+          <legend>Priority</legend>
+          <div class="segmented">
+            <label><input type="radio" name="priority" value="high"><span>High</span></label>
+            <label><input type="radio" name="priority" value="medium"><span>Medium</span></label>
+            <label><input type="radio" name="priority" value="low"><span>Low</span></label>
+          </div>
+        </fieldset>
 
-      <div class="card">
-        <h2>Reminders</h2>
-        <p>Browser notifications fire while this page is open (a pinned tab works well).
-          If you need a reminder when the app is closed, use <em>📅 Calendar</em> on a task. It downloads a calendar event that has an alarm.</p>
-        <p>Status: <strong id="notif-status"></strong></p>
-        <button id="notif-enable" class="btn">Enable notifications</button>
-      </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="tf-due">Due date <span class="optional">(optional)</span></label>
+            <input id="tf-due" name="due" type="date">
+          </div>
+          <div class="field">
+            <label for="tf-due-time">Due time <span class="optional">(optional)</span></label>
+            <input id="tf-due-time" name="dueTime" type="time">
+          </div>
+        </div>
+        <div class="quick" data-quick="due" role="group" aria-label="Set due date">
+          <button type="button" class="btn btn-sm" data-v="today">Today</button>
+          <button type="button" class="btn btn-sm" data-v="tomorrow">Tomorrow</button>
+          <button type="button" class="btn btn-sm" data-v="friday">This Friday</button>
+          <button type="button" class="btn btn-sm" data-v="nextweek">Next Monday</button>
+          <button type="button" class="btn btn-sm btn-ghost" data-v="clear">Clear date</button>
+        </div>
 
-      <div class="card">
-        <h2>Backup</h2>
-        <p>Your data stays in this browser only. Export a backup now and then, or to move to another computer.</p>
-        <div class="row">
-          <button id="export" class="btn">Export backup (JSON)</button>
-          <label class="btn">Import backup <input id="import" type="file" accept="application/json" hidden></label>
+        <div class="field">
+          <label for="tf-remind">Reminder <span class="optional">(optional)</span></label>
+          <input id="tf-remind" name="remindAt" type="datetime-local">
+        </div>
+        <div class="quick" data-quick="remind" role="group" aria-label="Set reminder">
+          <button type="button" class="btn btn-sm" data-v="1h">In 1 hour</button>
+          <button type="button" class="btn btn-sm" data-v="evening">Today 6 PM</button>
+          <button type="button" class="btn btn-sm" data-v="tomorrow9">Tomorrow 9 AM</button>
+          <button type="button" class="btn btn-sm" data-v="beforedue">1 hour before due</button>
+          <button type="button" class="btn btn-sm btn-ghost" data-v="clear">Clear reminder</button>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="tf-client">Client or project <span class="optional">(optional)</span></label>
+            <input id="tf-client" name="client" list="client-list" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="tf-estimate">Estimate in minutes <span class="optional">(optional)</span></label>
+            <input id="tf-estimate" name="estimateMin" type="number" min="0" step="5" inputmode="numeric" placeholder="60">
+          </div>
+        </div>
+        <datalist id="client-list"></datalist>
+
+        <label class="check"><input type="checkbox" name="billable" id="tf-billable">Billable: include this task's time on invoices</label>
+
+        <div class="field">
+          <label for="tf-notes">Notes <span class="optional">(optional)</span></label>
+          <textarea id="tf-notes" name="notes" rows="5"></textarea>
+        </div>
+
+        <div class="drawer-extra" id="task-extra" hidden>
+          <p class="extra-line" id="task-tracked"></p>
+          <button type="button" class="btn" data-act="add-to-calendar" id="task-ics"><svg class="i" aria-hidden="true"><use href="#i-calendar"/></svg>Add to calendar</button>
         </div>
       </div>
-    </section>
-  </main>
+      <footer class="drawer-foot">
+        <button type="button" class="btn btn-danger-ghost" data-act="delete-task" id="task-delete" hidden>Delete task</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-act="close-drawer">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="task-save">Create task</button>
+      </footer>
+    </form>
+  </aside>
 
-  <div id="toasts" class="toasts no-print"></div>
+  <!-- Time entry slide-over -->
+  <aside class="drawer" id="entry-drawer" role="dialog" aria-modal="true" aria-labelledby="entry-drawer-title" hidden>
+    <form id="entry-form" class="drawer-form" novalidate>
+      <header class="drawer-head">
+        <h2 id="entry-drawer-title">Add time</h2>
+        <button type="button" class="icon-btn" data-act="close-drawer" aria-label="Close panel" data-tip="Close panel" data-kbd="Esc">
+          <svg class="i" aria-hidden="true"><use href="#i-x"/></svg>
+        </button>
+      </header>
+      <div class="drawer-body">
+        <p class="notice" id="entry-draft-note" hidden>
+          <span id="entry-draft-text">Draft restored.</span>
+          <button type="button" class="link-btn" data-act="discard-entry-draft">Discard draft</button>
+        </p>
+        <div class="field">
+          <label for="ef-task">Task</label>
+          <select id="ef-task" name="taskId" required></select>
+        </div>
+        <div class="field">
+          <label for="ef-date">Date</label>
+          <input id="ef-date" name="date" type="date" required aria-describedby="ef-date-msg">
+          <p class="field-msg" id="ef-date-msg"></p>
+        </div>
+        <fieldset class="field" aria-describedby="ef-time-msg">
+          <legend>Time spent</legend>
+          <div class="field-row field-row-3">
+            <div class="field">
+              <label for="ef-from">From</label>
+              <input id="ef-from" name="from" type="time">
+            </div>
+            <div class="field">
+              <label for="ef-to">To</label>
+              <input id="ef-to" name="to" type="time">
+            </div>
+            <div class="field">
+              <label for="ef-minutes">Or minutes</label>
+              <input id="ef-minutes" name="minutes" type="number" min="1" step="1" inputmode="numeric" placeholder="45">
+            </div>
+          </div>
+          <p class="field-msg hint" id="ef-time-msg">Enter a start and end time, or just the number of minutes.</p>
+        </fieldset>
+        <div class="field">
+          <label for="ef-note">Note <span class="optional">(optional)</span></label>
+          <textarea id="ef-note" name="note" rows="3"></textarea>
+        </div>
+        <p class="extra-line" id="entry-invoiced" hidden></p>
+      </div>
+      <footer class="drawer-foot">
+        <button type="button" class="btn btn-danger-ghost" data-act="delete-entry" id="entry-delete" hidden>Delete entry</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-act="close-drawer">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="entry-save">Add time</button>
+      </footer>
+    </form>
+  </aside>
+
+  <!-- Confirmation dialog -->
+  <div class="dialog" id="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-body" hidden>
+    <h2 id="confirm-title"></h2>
+    <p id="confirm-body"></p>
+    <div class="dialog-actions">
+      <button type="button" class="btn" id="confirm-cancel">Cancel</button>
+      <button type="button" class="btn btn-danger" id="confirm-ok"></button>
+    </div>
+  </div>
+
+  <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
   <script src="app.js"></script>
 </body>
 </html>
