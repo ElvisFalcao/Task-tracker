@@ -22,7 +22,7 @@ What does "100% ready to ship, sell or present" mean for this project?
 ### Build
 - [ ] Core features working
 - [x] Cloud sync built: tasks, time entries and settings; device link; offline-safe (tested against a simulated server, 33 checks)
-- [ ] Cloud sync verified on the live site in Edge (work profile) against the real Supabase project
+- [x] Cloud sync verified on the live site in Edge (work profile) against the real Supabase project (36 tasks, 16 time entries and settings arrived 2026-10-26)
 - [ ] A second device connected with the sync link
 - [ ] Claude adds a task from a chat and it appears in the app
 
@@ -31,11 +31,11 @@ What does "100% ready to ship, sell or present" mean for this project?
 - [ ] Shown to the people it's for
 
 ## Next up
-- In Edge (work profile), open the live app → Settings → Sync → **Turn on sync**. Then check rows arrived: `select kind, count(*) from public.items group by kind;` in Supabase project `task-tracker` (ref `zvddhovhrfsllagujifn`).
-- Add a test task from a chat (SQL in README, "Adding tasks from outside the app") and confirm it appears within a minute.
+- Confirm the test task `c-20261026-0814-1` ("Test from Claude: tick me off or delete me") reached Edge. When the app picks it up, it sends back a filled-in copy, so `select data ? 'createdAt' from public.items where id = 'c-20261026-0814-1';` returns true. Then tick the last Build item.
 - Connect the phone: Settings → Sync → **Copy link for another device**, open it on the phone.
-- If the work network blocks `*.supabase.co`, sync shows "Couldn't reach the sync server"; tasks keep working locally.
+- Sync runs while the tab is visible (on open, on return, every minute). A hidden or sleeping tab catches up when it's next viewed.
 
 ## Log
+- 2026-10-26 · Claude Code · Sync turned on in Edge and verified against Supabase; test task added from a chat.
 - 2026-10-26 · Claude Code · Added optional cloud sync (Settings → Sync) backed by a new Supabase project `task-tracker`; documented how to add tasks from outside the app.
 - 2026-10-21 · Room · Tracking started from the dashboard.
