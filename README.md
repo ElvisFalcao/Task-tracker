@@ -39,15 +39,36 @@ Open `index.html` in your browser, or use the live link above. The left sidebar 
 3. Go to **Invoice** and choose the dates and client. The invoice preview updates as you change them.
 4. **Print or save PDF** gives you a clean invoice. **Mark as invoiced** stops that time from being billed twice, and has an Undo.
 
+### Sync (optional)
+Turn on **Settings → Sync** to keep tasks, time entries and settings the same on every device, and to let Claude add tasks from any chat.
+- On the first device, choose **Turn on sync**.
+- To add another device, choose **Copy link for another device** and open the link on it. Keep the link private: anyone who has it can see and change your tasks.
+- The app syncs when you open it, when you come back to it, every minute while it's open, and a moment after each change. Changes made offline go up when you're back online.
+- Data is stored in a Supabase project (`task-tracker`, ref `zvddhovhrfsllagujifn`). Each device sends its secret sync key with every request; the database only accepts the first key ever registered, and rows are scoped to that key's hash. The publishable API key in `app.js` can't read anything without the sync key.
+- The running timer stays on the device it was started on; the time entry it creates syncs when you stop it.
+
+**Adding tasks from outside the app** (this is how Claude does it): insert a row into `public.items` with `kind = 'task'`, a new `id` made of letters, numbers, `-` or `_`, the space from `public.allowed_spaces`, and the task as `data`. Only `title` is required; the app fills in the rest the next time it syncs.
+
+```sql
+insert into public.items (space, kind, id, data)
+select space, 'task', 'c-20261026-1',
+       '{"title": "Prepare Ghana influencer brief", "notes": "For Kartik", "client": "Ibucap", "priority": "high"}'::jsonb
+from public.allowed_spaces limit 1;
+```
+
+Task fields: `title`, `notes`, `priority` (`high` / `medium` / `low`), `due` (`YYYY-MM-DD`), `dueTime` (`HH:MM`), `remindAt` (`YYYY-MM-DDTHH:MM`, local time), `client`, `estimateMin` (minutes), `billable` (true/false), `status` (`todo` / `done`).
+
+If the Supabase project is paused (free projects pause after a week with no activity), restore it from the Supabase dashboard and sync carries on.
+
 ### Your data
-All data is saved in your browser's local storage, so it stays on your device. Use **Settings → Backup → Download backup** to save a JSON file. To restore it or move it to another browser, use **Settings → Danger zone → Restore from backup**, which replaces what's there after asking you first.
+Without sync, all data is saved only in your browser's local storage. Use **Settings → Backup → Download backup** to save a JSON file. To restore it or move it to another browser, use **Settings → Danger zone → Restore from backup**, which replaces what's there after asking you first. With sync on, a restore also replaces the data on your other devices.
 
 ## Hosting it (optional)
 To use it from any device, turn on **GitHub Pages**: go to repo **Settings → Pages**, choose "Deploy from a branch", then pick the branch and `/ (root)`.
-Data is still stored per browser. Use backup and restore to move it between devices.
+Without sync, data is stored per browser. Turn on sync, or use backup and restore, to move it between devices.
 
 ## Files
 - `index.html`: page structure
 - `styles.css`: styling (light and dark mode, phone to desktop, print layout for invoices)
-- `app.js`: all the logic
+- `app.js`: all the logic, including cloud sync (search for "Cloud sync")
 - `fonts/`: IBM Plex Sans, bundled so the app looks the same everywhere and works offline (SIL Open Font License, see `fonts/OFL-IBM-Plex-Sans.txt`)

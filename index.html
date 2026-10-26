@@ -281,7 +281,7 @@
           <header class="page-header">
             <div class="page-heading">
               <h1 id="h-settings" tabindex="-1">Settings</h1>
-              <p class="page-desc">Your invoice details, reminders and backups. Everything is stored in this browser only.</p>
+              <p class="page-desc">Your invoice details, reminders, sync and backups.</p>
             </div>
           </header>
 
@@ -290,6 +290,7 @@
               <button type="button" class="settings-link" data-target="set-business">Business details</button>
               <button type="button" class="settings-link" data-target="set-invoice">Invoice defaults</button>
               <button type="button" class="settings-link" data-target="set-reminders">Reminders</button>
+              <button type="button" class="settings-link" data-target="set-sync">Sync</button>
               <button type="button" class="settings-link" data-target="set-backup">Backup</button>
               <button type="button" class="settings-link" data-target="set-danger">Danger zone</button>
             </nav>
@@ -363,15 +364,39 @@
                 </div>
               </section>
 
+              <section class="set-section" id="set-sync" aria-labelledby="h-set-sync">
+                <h2 id="h-set-sync">Sync</h2>
+                <p class="set-desc">Keep your tasks, time and settings the same on every device. With sync on, Claude can also add tasks for you from any chat.</p>
+                <div class="status-row">
+                  <div>
+                    <p class="status-label">Cloud sync</p>
+                    <p class="status-value" id="sync-status" aria-live="polite">Off</p>
+                  </div>
+                  <button type="button" class="btn" id="sync-enable"><svg class="i" aria-hidden="true"><use href="#i-upload"/></svg>Turn on sync</button>
+                  <button type="button" class="btn" id="sync-now" hidden>Sync now</button>
+                </div>
+                <div class="sync-on" id="sync-on" hidden>
+                  <p class="set-desc">To add another device, copy this device's link and open it there. Keep the link private: anyone who has it can see and change your tasks.</p>
+                  <div class="form-actions">
+                    <button type="button" class="btn" id="sync-copy">Copy link for another device</button>
+                    <button type="button" class="btn btn-danger-soft" id="sync-off">Turn off on this device</button>
+                  </div>
+                  <div class="field" id="sync-link-field" hidden>
+                    <label for="sync-link">Link for another device</label>
+                    <input id="sync-link" type="text" readonly spellcheck="false" autocomplete="off">
+                  </div>
+                </div>
+              </section>
+
               <section class="set-section" id="set-backup" aria-labelledby="h-set-backup">
                 <h2 id="h-set-backup">Backup</h2>
-                <p class="set-desc">Your data lives only in this browser. Download a backup now and then, or to move to another device.</p>
+                <p class="set-desc">Download a backup now and then. Without sync, your data lives only in this browser.</p>
                 <button type="button" class="btn" data-act="export-backup"><svg class="i" aria-hidden="true"><use href="#i-download"/></svg>Download backup</button>
               </section>
 
               <section class="set-section danger-zone" id="set-danger" aria-labelledby="h-set-danger">
                 <h2 id="h-set-danger">Danger zone</h2>
-                <p class="set-desc">Restoring a backup replaces every task, time entry and setting in this browser with the ones in the file.</p>
+                <p class="set-desc">Restoring a backup replaces every task, time entry and setting in this browser with the ones in the file. If sync is on, your other devices get the same changes.</p>
                 <button type="button" class="btn btn-danger-soft" data-act="restore-backup"><svg class="i" aria-hidden="true"><use href="#i-upload"/></svg>Restore from backup</button>
                 <input type="file" id="restore-file" accept="application/json,.json" hidden>
               </section>

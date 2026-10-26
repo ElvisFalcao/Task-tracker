@@ -7,6 +7,8 @@
 const STORAGE_KEY = 'workload-tracker-v1';
 const UI_KEY = 'workload-ui-v1';
 const DRAFT_KEYS = { task: 'workload-draft-task-v1', entry: 'workload-draft-entry-v1' };
+const SYNC_KEY = 'workload-sync-v1'; // cloud sync settings for this device (see Cloud sync)
+let syncTimer = 0;
 
 const DEFAULT_STATE = {
   tasks: [],
@@ -61,7 +63,9 @@ let state = load();
 function save() {
   if (!writeJson(STORAGE_KEY, state)) {
     toast("We couldn't save your changes. This browser's storage may be full or turned off, so download a backup from Settings.");
+    return;
   }
+  syncSoon();
 }
 
 const ui = Object.assign(
@@ -541,6 +545,7 @@ function leaveDrawer() {
 
 function handleLocation() {
   if (location.hash.startsWith('#add=')) { importFromLink(); return; }
+  if (location.hash.startsWith('#sync=')) { connectFromLink(); return; }
   if (location.hash === lastHash) return;
   const r = parseHash(location.hash);
   if (!r) {
@@ -603,7 +608,7 @@ function refreshPage() {
   if (route.page === 'tasks') renderTasks();
   else if (route.page === 'time') renderTime();
   else if (route.page === 'invoice') renderInvoice();
-  else if (route.page === 'settings') renderNotifStatus();
+  else if (route.page === 'settings') { renderNotifStatus(); renderSyncSettings(); }
 }
 
 /** Re-render while keeping keyboard focus on the same control in the same row. */
@@ -1955,6 +1960,7 @@ function renderSettings() {
   c.payment.value = s.payment || '';
   for (const input of [b.email, c.rate, c.nextInvoiceNo]) clearFieldError(input);
   renderNotifStatus();
+  renderSyncSettings();
 }
 
 const EMAIL_ERROR = 'Enter an email like name@example.com, or leave it empty.';
@@ -2052,6 +2058,401 @@ $('#restore-file').addEventListener('change', async e => {
 });
 
 /* ==========================================================================
+   Cloud sync
+   Optional. When it's on, tasks, time entries and settings are copied to a
+   small Supabase database so every device sees the same list, and Claude can
+   add tasks from any chat. Each device still works from localStorage: sync
+   sends what changed here and fetches what changed elsewhere.
+   Every request carries this device's secret sync key. The database only
+   accepts the first key ever registered and keeps rows scoped to its hash,
+   so the public API key below can't read anything on its own.
+   ========================================================================== */
+
+const SYNC_API = 'https://zvddhovhrfsllagujifn.supabase.co/rest/v1';
+const SYNC_PUBLIC_KEY = 'sb_publishable_E-UJyjjT20LxXP8COq4JZA_SFBla3dg';
+const SYNC_KINDS = ['task', 'entry', 'settings'];
+const SYNC_PAGE = 1000;
+
+const syncStatus = { state: 'off', at: 0, problem: '' };
+let syncRun = null;
+let syncAgain = false;
+
+function readSyncMeta() {
+  const m = readJson(SYNC_KEY);
+  return m?.key && m?.space ? { pushed: {}, lastPull: null, ready: false, ...m } : null;
+}
+
+/** JSON with object keys sorted, so the same data always compares equal whatever order its keys were set in. */
+function stableJson(v) {
+  return JSON.stringify(v, (_, val) => (val && typeof val === 'object' && !Array.isArray(val)
+    ? Object.fromEntries(Object.keys(val).sort().map(k => [k, val[k]]))
+    : val));
+}
+
+/** Server timestamps have microseconds; Date.parse is only guaranteed to read milliseconds. */
+const parseTs = s => Date.parse(String(s).replace(/(\.\d{3})\d+/, '$1'));
+
+function newSyncKey() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function syncSpaceFor(key) {
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key));
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function syncRequest(key, path, { method = 'GET', body, prefer } = {}) {
+  const headers = { apikey: SYNC_PUBLIC_KEY, 'x-sync-key': key };
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (prefer) headers.Prefer = prefer;
+  const res = await fetch(`${SYNC_API}/${path}`, {
+    method, headers, cache: 'no-store',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Sync request failed (${res.status})`);
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+/** True when the key is (or has just become) the one this database accepts. */
+const claimSpace = async key => (await syncRequest(key, 'rpc/claim_space', { method: 'POST', body: {} })) === true;
+
+/** Everything this device syncs, keyed "kind:id". */
+function syncSnapshot() {
+  const m = new Map();
+  for (const t of state.tasks) if (t?.id) m.set(`task:${t.id}`, t);
+  for (const e of state.entries) if (e?.id) m.set(`entry:${e.id}`, e);
+  m.set('settings:settings', state.settings);
+  return m;
+}
+
+function splitSyncKey(k) {
+  const i = k.indexOf(':');
+  return [k.slice(0, i), k.slice(i + 1)];
+}
+
+/** Fills in anything that a task added from outside the app (by Claude, say) left out. */
+function normalizeRemote(kind, id, data, updatedAt) {
+  if (kind === 'settings') return { ...DEFAULT_STATE.settings, ...data };
+  if (kind === 'entry') return { ...data, id };
+  const t = {
+    title: '', notes: '', priority: 'medium', due: '', dueTime: '', remindAt: '', client: '',
+    estimateMin: null, billable: false, status: 'todo', createdAt: parseTs(updatedAt) || Date.now(), reminded: false,
+    ...data, id,
+  };
+  t.title = String(t.title || 'Untitled task');
+  if (!['high', 'medium', 'low'].includes(t.priority)) t.priority = 'medium';
+  if (!['todo', 'done'].includes(t.status)) t.status = 'todo';
+  return t;
+}
+
+function putLocal(kind, obj) {
+  if (kind === 'settings') { state.settings = obj; return; }
+  const list = kind === 'task' ? state.tasks : state.entries;
+  const i = list.findIndex(x => x.id === obj.id);
+  if (i >= 0) list[i] = obj;
+  else list.push(obj);
+}
+
+function removeLocal(kind, id) {
+  if (kind === 'task') state.tasks = state.tasks.filter(x => x.id !== id);
+  else if (kind === 'entry') state.entries = state.entries.filter(x => x.id !== id);
+}
+
+/**
+ * Applies one row from the server. A change made on this device that hasn't
+ * been sent yet wins, except on a device's first sync, where the server wins.
+ */
+function applyRemote(meta, local, row, first, added) {
+  if (!SYNC_KINDS.includes(row.kind)) return false;
+  const k = `${row.kind}:${row.id}`;
+  const mine = local.get(k);
+  const mineJson = mine === undefined ? undefined : stableJson(mine);
+  if (!first && meta.pushed[k] !== mineJson) return false;
+
+  if (row.deleted) {
+    delete meta.pushed[k];
+    if (mine === undefined) return false;
+    // Keep a task whose timer is running here; it gets sent back up on the next sync.
+    if (row.kind === 'task' && state.active?.taskId === row.id) return false;
+    removeLocal(row.kind, row.id);
+    local.delete(k);
+    return true;
+  }
+
+  meta.pushed[k] = stableJson(row.data);
+  const obj = normalizeRemote(row.kind, row.id, row.data, row.updated_at);
+  if (mineJson === stableJson(obj)) return false;
+  putLocal(row.kind, obj);
+  local.set(k, obj);
+  if (row.kind === 'task' && mine === undefined && obj.status !== 'done') added.push(obj);
+  return true;
+}
+
+async function syncPull(meta, first, added) {
+  const local = syncSnapshot();
+  let changed = false;
+  // Look back 30 seconds so a write that committed late isn't missed. Applying a row twice is harmless.
+  let since = meta.lastPull ? new Date(parseTs(meta.lastPull) - 30000).toISOString() : null;
+  for (;;) {
+    const rows = await syncRequest(meta.key,
+      `items?select=kind,id,data,deleted,updated_at&space=eq.${meta.space}&order=updated_at.asc&limit=${SYNC_PAGE}`
+      + (since ? `&updated_at=gt.${encodeURIComponent(since)}` : ''));
+    for (const row of rows) if (applyRemote(meta, local, row, first, added)) changed = true;
+    if (rows.length) {
+      const newest = rows[rows.length - 1].updated_at;
+      if (!meta.lastPull || parseTs(newest) > parseTs(meta.lastPull)) meta.lastPull = newest;
+    }
+    if (rows.length < SYNC_PAGE) break;
+    since = rows[rows.length - 1].updated_at;
+  }
+  return changed;
+}
+
+async function syncPush(meta) {
+  const local = syncSnapshot();
+  const rows = [], sent = [];
+  for (const [k, obj] of local) {
+    const json = stableJson(obj);
+    if (meta.pushed[k] === json) continue;
+    const [kind, id] = splitSyncKey(k);
+    rows.push({ space: meta.space, kind, id, data: obj, deleted: false });
+    sent.push([k, json]);
+  }
+  for (const k of Object.keys(meta.pushed)) {
+    if (local.has(k)) continue;
+    const [kind, id] = splitSyncKey(k);
+    rows.push({ space: meta.space, kind, id, data: JSON.parse(meta.pushed[k]), deleted: true });
+    sent.push([k, null]);
+  }
+  for (let i = 0; i < rows.length; i += 500) {
+    await syncRequest(meta.key, 'items?on_conflict=space,kind,id', {
+      method: 'POST', body: rows.slice(i, i + 500), prefer: 'resolution=merge-duplicates,return=minimal',
+    });
+  }
+  for (const [k, json] of sent) {
+    if (json === null) delete meta.pushed[k];
+    else meta.pushed[k] = json;
+  }
+}
+
+async function syncOnce() {
+  const meta = readSyncMeta();
+  if (!meta) return;
+
+  // Another tab may have just changed things; work from what's saved, not from a stale copy.
+  let raw = null;
+  try { raw = localStorage.getItem(STORAGE_KEY); } catch { /* storage blocked */ }
+  if (raw && raw !== JSON.stringify(state)) {
+    state = load();
+    refreshPage();
+    tickTimer();
+  }
+
+  setSyncStatus('syncing');
+  const first = !meta.ready;
+  const added = [];
+  let changed = false;
+  if (first) changed = await syncPull(meta, true, added); // first sync: take what's already there, then add what's only here
+  await syncPush(meta);
+  if (!first) changed = (await syncPull(meta, false, added)) || changed;
+  // Tasks added from outside the app arrive with gaps filled in here; send the completed version straight back.
+  if (changed) await syncPush(meta);
+  meta.ready = true;
+
+  // State before meta: if saving state failed, meta must not claim these changes were synced.
+  if (changed && !writeJson(STORAGE_KEY, state)) throw new Error('Local storage is full or turned off');
+  writeJson(SYNC_KEY, meta);
+  setSyncStatus('ok');
+
+  if (changed) {
+    refreshPage();
+    tickTimer();
+    if (!first && added.length) {
+      toast(added.length === 1 ? `New task added: ${added[0].title}` : `${plural(added.length, 'new task')} added.`,
+        { action: { label: 'View all open', run: () => { if (route.page !== 'tasks') navigate('tasks'); setView('all'); } } });
+    }
+  }
+}
+
+function withSyncLock(fn) {
+  // Tabs take turns, so two open tabs never sync the same changes at once.
+  return navigator.locks?.request ? navigator.locks.request('workload-sync', fn) : fn();
+}
+
+function syncNow() {
+  if (!readSyncMeta()) return Promise.resolve();
+  if (syncRun) { syncAgain = true; return syncRun; }
+  clearTimeout(syncTimer);
+  syncRun = (async () => {
+    try {
+      do {
+        syncAgain = false;
+        await withSyncLock(syncOnce);
+      } while (syncAgain);
+    } catch (err) {
+      console.warn(err);
+      setSyncStatus('error', navigator.onLine === false
+        ? "You're offline. Changes are saved here and will sync when you're back online."
+        : "Couldn't reach the sync server. Changes are saved here and will sync when it's back.");
+    } finally {
+      syncRun = null;
+    }
+  })();
+  return syncRun;
+}
+
+/** Sync shortly after a change, so a burst of edits goes up together. */
+function syncSoon(delay = 1500) {
+  if (!readSyncMeta()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncNow, delay);
+}
+
+function syncIfStale(ms = 15000) {
+  if (Date.now() - syncStatus.at > ms) syncNow();
+}
+
+function setSyncStatus(s, problem = '') {
+  syncStatus.state = s;
+  syncStatus.problem = problem;
+  if (s === 'ok') syncStatus.at = Date.now();
+  if (route.page === 'settings') renderSyncSettings();
+}
+
+function syncStatusText() {
+  if (!readSyncMeta()) return 'Off';
+  if (syncStatus.state === 'error') return syncStatus.problem;
+  if (syncStatus.state === 'syncing' && !syncStatus.at) return 'Syncing…';
+  if (syncStatus.at) return `On · last synced at ${fmtTime(syncStatus.at)}`;
+  return 'On';
+}
+
+function renderSyncSettings() {
+  const on = !!readSyncMeta();
+  $('#sync-status').textContent = syncStatusText();
+  $('#sync-enable').hidden = on;
+  $('#sync-now').hidden = !on;
+  $('#sync-on').hidden = !on;
+  if (!on) $('#sync-link-field').hidden = true;
+}
+
+function syncLink() {
+  const meta = readSyncMeta();
+  return meta ? `${location.origin}${location.pathname}#sync=${meta.key}` : '';
+}
+
+async function startSync(key) {
+  if (!writeJson(SYNC_KEY, { key, space: await syncSpaceFor(key), pushed: {}, lastPull: null, ready: false })) {
+    throw new Error('Local storage is full or turned off');
+  }
+  setSyncStatus('syncing');
+  renderSyncSettings();
+  await syncNow();
+}
+
+const SYNC_UNREACHABLE = "Couldn't reach the sync server. Check your connection and try again.";
+
+$('#sync-enable').addEventListener('click', async e => {
+  const btn = e.currentTarget;
+  if (!window.crypto?.subtle) {
+    toast('Sync only works in the online version of the app, at an https:// address.');
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const key = newSyncKey();
+    if (!(await claimSpace(key))) {
+      toast('Sync is already on for another device. On that device, go to Settings → Sync and copy the link for this one.');
+      return;
+    }
+    await startSync(key);
+    toast(syncStatus.state === 'error' ? syncStatus.problem : 'Sync is on. Copy the link below to add your other devices.');
+  } catch (err) {
+    console.warn(err);
+    toast(SYNC_UNREACHABLE);
+  } finally {
+    btn.disabled = false;
+    renderSyncSettings();
+  }
+});
+
+$('#sync-now').addEventListener('click', async () => {
+  await syncNow();
+  toast(syncStatus.state === 'error' ? syncStatus.problem : 'Everything is up to date.');
+});
+
+$('#sync-copy').addEventListener('click', async () => {
+  const link = syncLink();
+  try {
+    await navigator.clipboard.writeText(link);
+    toast('Link copied. Open it on your other device, and keep it private.');
+  } catch {
+    // Clipboard blocked: show the link so it can be copied by hand.
+    const field = $('#sync-link-field'), input = $('#sync-link');
+    field.hidden = false;
+    input.value = link;
+    input.focus();
+    input.select();
+  }
+});
+
+$('#sync-off').addEventListener('click', async () => {
+  const ok = await confirmDialog({
+    title: 'Turn off sync on this device?',
+    body: "Everything stays on this device but stops matching your others. If this is your only synced device, copy its link first: you'll need it to turn sync back on.",
+    confirmLabel: 'Turn off sync',
+  });
+  if (!ok) return;
+  writeJson(SYNC_KEY, null);
+  setSyncStatus('off');
+  renderSyncSettings();
+  toast('Sync is off on this device.');
+});
+
+/** A link ending in #sync=<key> connects this device to the others. */
+async function connectFromLink() {
+  const m = location.hash.match(/^#sync=([A-Za-z0-9_-]{32,})$/);
+  history.replaceState(null, '', '#/settings'); // keep the key out of the address bar and history
+  lastHash = null;
+  handleLocation();
+  if (!m) {
+    toast('That sync link is incomplete. Copy the whole link and open it again.');
+    return;
+  }
+  const key = m[1];
+  if (readSyncMeta()?.key === key) {
+    toast('This device is already synced.');
+    syncNow();
+    return;
+  }
+  if (!window.crypto?.subtle) {
+    toast('Sync only works in the online version of the app, at an https:// address.');
+    return;
+  }
+  const ok = await confirmDialog({
+    title: 'Turn on sync on this device?',
+    body: 'Tasks, time and settings from your other devices are added here, and anything that is only on this device is added to them.',
+    confirmLabel: 'Turn on sync',
+    danger: false,
+  });
+  if (!ok) return;
+  try {
+    if (!(await claimSpace(key))) {
+      toast("That sync link doesn't work any more. Copy a new one from a synced device.");
+      return;
+    }
+    await startSync(key);
+    toast(syncStatus.state === 'error' ? syncStatus.problem : 'Sync is on. This device now matches your others.');
+  } catch (err) {
+    console.warn(err);
+    toast(SYNC_UNREACHABLE);
+  }
+  renderSyncSettings();
+}
+
+/* ==========================================================================
    Adding tasks from a link
    A link ending in #add=<base64url JSON array of tasks> adds those tasks to
    the existing list (it never replaces anything). Tasks whose id is already
@@ -2110,6 +2511,10 @@ async function importFromLink() {
 
 // Keep tabs in sync if the app is open in more than one window.
 addEventListener('storage', e => {
+  if (e.key === SYNC_KEY) {
+    if (route.page === 'settings') renderSyncSettings();
+    return;
+  }
   if (e.key !== STORAGE_KEY) return;
   state = load();
   refreshPage();
@@ -2125,3 +2530,10 @@ setInterval(tickTimer, 1000);
 setInterval(checkReminders, 15000);
 checkReminders();
 dailyBriefing();
+
+// Cloud sync: on open, when the app comes back into view, every minute while visible, and when back online.
+syncNow();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncIfStale(5000); });
+addEventListener('focus', () => syncIfStale());
+addEventListener('online', () => syncNow());
+setInterval(() => { if (document.visibilityState === 'visible') syncNow(); }, 60000);

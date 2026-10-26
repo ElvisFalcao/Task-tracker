@@ -743,6 +743,8 @@ input[type="date"], input[type="time"], input[type="datetime-local"] { cursor: p
 }
 .status-label { font-size: var(--text-sec); color: var(--ink-3); }
 .status-value { font-weight: 500; }
+.sync-on { display: grid; gap: var(--s4); }
+#sync-link { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--text-sec); }
 .danger-zone { margin-top: var(--s6); background: var(--danger-soft); box-shadow: none; }
 .danger-zone h2 { color: var(--danger); }
 
