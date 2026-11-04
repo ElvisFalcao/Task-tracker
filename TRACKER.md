@@ -6,7 +6,7 @@ type:
 stage: Live
 tools: [Supabase, GitHub Pages]
 started: 2026-10-21
-updated: 2026-10-26
+updated: 2026-11-04
 target:
 live: https://elvisfalcao.github.io/Task-tracker/
 repo: https://github.com/ElvisFalcao/Task-tracker
@@ -23,7 +23,7 @@ What does "100% ready to ship, sell or present" mean for this project?
 - [ ] Core features working
 - [x] Cloud sync built: tasks, time entries and settings; device link; offline-safe (tested against a simulated server, 33 checks)
 - [x] Cloud sync verified on the live site in Edge (work profile) against the real Supabase project (36 tasks, 16 time entries and settings arrived 2026-10-26)
-- [ ] A second device connected with the sync link
+- [x] A second device connected with the sync link
 - [ ] Claude adds a task from a chat and it appears in the app
 
 ### Ship
